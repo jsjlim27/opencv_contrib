@@ -1,7 +1,6 @@
 #include "precomp.hpp"
 #include <iostream>
 #include <stdarg.h>
-//#include <opencv2/cor.hpp>
 #include <opencv2/core/hal/hal.hpp>
 #include <opencv2/core/utils/tls.hpp>
 
@@ -10,17 +9,15 @@ namespace cv
 namespace xfeatures2d
 {
 
-/*!
- */
 class ASVSIFT_Impl : public ASVSIFT
 {
 public:
     explicit ASVSIFT_Impl( int nfeatures = 0, int nOctaveLayers = 3,
-                          double contrastThreshold = 0.04, double edgeThreshold = 10,
-                          double sigma = 1.6,
-                          int nSampledScales = 10, 
-                          float scalingRatioSmallest = 1.0f / 6.0f,
-                          float scalingRatioLargest = 3.0f);
+                           double contrastThreshold = 0.04, double edgeThreshold = 10,
+                           double sigma = 1.6,
+                           int nSampledScales = 10, 
+                           float scalingRatioSmallest = 1.0f / 6.0f,
+                           float scalingRatioLargest = 3.0f);
 
     //! returns the descriptor size in floats (128)
     int descriptorSize() const CV_OVERRIDE;
@@ -33,15 +30,15 @@ public:
 
     //! finds the keypoints and computes descriptors for them using SIFT algorithm.
     //! Optionally it can compute descriptors for the user-provided keypoints
-    void detectAndCompute(InputArray img, InputArray mask,
-                    std::vector<KeyPoint>& keypoints,
-                    OutputArray descriptors,
-                    bool useProvidedKeypoints = false) CV_OVERRIDE;
+    void detectAndCompute( InputArray img, InputArray mask,
+                           std::vector<KeyPoint>& keypoints,
+                           OutputArray descriptors,
+                           bool useProvidedKeypoints = false ) CV_OVERRIDE;
 
     void buildGaussianPyramid( const Mat& base, std::vector<Mat>& pyr, int nOctaves ) const;
     void buildDoGPyramid( const std::vector<Mat>& pyr, std::vector<Mat>& dogpyr ) const;
     void findScaleSpaceExtrema( const std::vector<Mat>& gauss_pyr, const std::vector<Mat>& dog_pyr,
-                               std::vector<KeyPoint>& keypoints ) const;
+                                std::vector<KeyPoint>& keypoints ) const;
 
 protected:
     CV_PROP_RW int nfeatures;
@@ -55,8 +52,8 @@ protected:
 };
 
 Ptr<ASVSIFT> ASVSIFT::create( int _nfeatures, int _nOctaveLayers,
-                     double _contrastThreshold, double _edgeThreshold, double _sigma, 
-                     int _nSampledScales, float _scalingRatioSmallest, float _scalingRatioLargest )
+                              double _contrastThreshold, double _edgeThreshold, double _sigma, 
+                              int _nSampledScales, float _scalingRatioSmallest, float _scalingRatioLargest )
 {
     return makePtr<ASVSIFT_Impl>(_nfeatures, _nOctaveLayers, _contrastThreshold, _edgeThreshold, _sigma, 
                                  _nSampledScales, _scalingRatioSmallest, _scalingRatioLargest );
@@ -153,7 +150,6 @@ static Mat createInitialImage( const Mat& img, bool doubleImageSize, float sigma
     }
 }
 
-
 void ASVSIFT_Impl::buildGaussianPyramid( const Mat& base, std::vector<Mat>& pyr, int nOctaves ) const
 {
     std::vector<double> sig(nOctaveLayers + 3);
@@ -193,14 +189,12 @@ void ASVSIFT_Impl::buildGaussianPyramid( const Mat& base, std::vector<Mat>& pyr,
     }
 }
 
-
 class buildDoGPyramidComputer : public ParallelLoopBody
 {
 public:
-    buildDoGPyramidComputer(
-        int _nOctaveLayers,
-        const std::vector<Mat>& _gpyr,
-        std::vector<Mat>& _dogpyr)
+    buildDoGPyramidComputer( int _nOctaveLayers,
+                             const std::vector<Mat>& _gpyr,
+                             std::vector<Mat>& _dogpyr)
         : nOctaveLayers(_nOctaveLayers),
           gpyr(_gpyr),
           dogpyr(_dogpyr) { }
@@ -338,28 +332,28 @@ static float calcOrientationHist( const Mat& img, Point pt, int radius,
                 __d_1_16,
                 _mm256_fmadd_ps(
                     _mm256_add_ps(_mm256_loadu_ps(&temphist[i-1]), _mm256_loadu_ps(&temphist[i+1])),
-                    __d_4_16,
-                    _mm256_mul_ps(_mm256_loadu_ps(&temphist[i]), __d_6_16)));
+                        __d_4_16,
+                        _mm256_mul_ps(_mm256_loadu_ps(&temphist[i]), __d_6_16)));
 #else
-            __m256 __hist = _mm256_add_ps(
-                _mm256_mul_ps(
-                        _mm256_add_ps(_mm256_loadu_ps(&temphist[i-2]), _mm256_loadu_ps(&temphist[i+2])),
-                        __d_1_16),
-                _mm256_add_ps(
-                    _mm256_mul_ps(
-                        _mm256_add_ps(_mm256_loadu_ps(&temphist[i-1]), _mm256_loadu_ps(&temphist[i+1])),
-                        __d_4_16),
-                    _mm256_mul_ps(_mm256_loadu_ps(&temphist[i]), __d_6_16)));
+                __m256 __hist = _mm256_add_ps(
+                        _mm256_mul_ps(
+                            _mm256_add_ps(_mm256_loadu_ps(&temphist[i-2]), _mm256_loadu_ps(&temphist[i+2])),
+                            __d_1_16),
+                        _mm256_add_ps(
+                            _mm256_mul_ps(
+                                _mm256_add_ps(_mm256_loadu_ps(&temphist[i-1]), _mm256_loadu_ps(&temphist[i+1])),
+                                __d_4_16),
+                            _mm256_mul_ps(_mm256_loadu_ps(&temphist[i]), __d_6_16)));
 #endif
-            _mm256_storeu_ps(&hist[i], __hist);
+                _mm256_storeu_ps(&hist[i], __hist);
         }
     }
 #endif
     for( ; i < n; i++ )
     {
         hist[i] = (temphist[i-2] + temphist[i+2])*(1.f/16.f) +
-            (temphist[i-1] + temphist[i+1])*(4.f/16.f) +
-            temphist[i]*(6.f/16.f);
+                  (temphist[i-1] + temphist[i+1])*(4.f/16.f) +
+                   temphist[i]*(6.f/16.f);
     }
 
     float maxval = hist[0];
@@ -368,7 +362,6 @@ static float calcOrientationHist( const Mat& img, Point pt, int radius,
 
     return maxval;
 }
-
 
 //
 // Interpolates a scale-space extremum's location and scale to subpixel
@@ -394,19 +387,19 @@ static bool adjustLocalExtrema( const std::vector<Mat>& dog_pyr, KeyPoint& kpt, 
         const Mat& next = dog_pyr[idx+1];
 
         Vec3f dD((img.at<sift_wt>(r, c+1) - img.at<sift_wt>(r, c-1))*deriv_scale,
-                 (img.at<sift_wt>(r+1, c) - img.at<sift_wt>(r-1, c))*deriv_scale,
-                 (next.at<sift_wt>(r, c) - prev.at<sift_wt>(r, c))*deriv_scale);
+                (img.at<sift_wt>(r+1, c) - img.at<sift_wt>(r-1, c))*deriv_scale,
+                (next.at<sift_wt>(r, c) - prev.at<sift_wt>(r, c))*deriv_scale);
 
         float v2 = (float)img.at<sift_wt>(r, c)*2;
         float dxx = (img.at<sift_wt>(r, c+1) + img.at<sift_wt>(r, c-1) - v2)*second_deriv_scale;
         float dyy = (img.at<sift_wt>(r+1, c) + img.at<sift_wt>(r-1, c) - v2)*second_deriv_scale;
         float dss = (next.at<sift_wt>(r, c) + prev.at<sift_wt>(r, c) - v2)*second_deriv_scale;
         float dxy = (img.at<sift_wt>(r+1, c+1) - img.at<sift_wt>(r+1, c-1) -
-                     img.at<sift_wt>(r-1, c+1) + img.at<sift_wt>(r-1, c-1))*cross_deriv_scale;
+                        img.at<sift_wt>(r-1, c+1) + img.at<sift_wt>(r-1, c-1))*cross_deriv_scale;
         float dxs = (next.at<sift_wt>(r, c+1) - next.at<sift_wt>(r, c-1) -
-                     prev.at<sift_wt>(r, c+1) + prev.at<sift_wt>(r, c-1))*cross_deriv_scale;
+                        prev.at<sift_wt>(r, c+1) + prev.at<sift_wt>(r, c-1))*cross_deriv_scale;
         float dys = (next.at<sift_wt>(r+1, c) - next.at<sift_wt>(r-1, c) -
-                     prev.at<sift_wt>(r+1, c) + prev.at<sift_wt>(r-1, c))*cross_deriv_scale;
+                        prev.at<sift_wt>(r+1, c) + prev.at<sift_wt>(r-1, c))*cross_deriv_scale;
 
         Matx33f H(dxx, dxy, dxs,
                   dxy, dyy, dys,
@@ -446,8 +439,8 @@ static bool adjustLocalExtrema( const std::vector<Mat>& dog_pyr, KeyPoint& kpt, 
         const Mat& prev = dog_pyr[idx-1];
         const Mat& next = dog_pyr[idx+1];
         Matx31f dD((img.at<sift_wt>(r, c+1) - img.at<sift_wt>(r, c-1))*deriv_scale,
-                   (img.at<sift_wt>(r+1, c) - img.at<sift_wt>(r-1, c))*deriv_scale,
-                   (next.at<sift_wt>(r, c) - prev.at<sift_wt>(r, c))*deriv_scale);
+                    (img.at<sift_wt>(r+1, c) - img.at<sift_wt>(r-1, c))*deriv_scale,
+                    (next.at<sift_wt>(r, c) - prev.at<sift_wt>(r, c))*deriv_scale);
         float t = dD.dot(Matx31f(xc, xr, xi));
 
         contr = img.at<sift_wt>(r, c)*img_scale + t * 0.5f;
@@ -459,7 +452,7 @@ static bool adjustLocalExtrema( const std::vector<Mat>& dog_pyr, KeyPoint& kpt, 
         float dxx = (img.at<sift_wt>(r, c+1) + img.at<sift_wt>(r, c-1) - v2)*second_deriv_scale;
         float dyy = (img.at<sift_wt>(r+1, c) + img.at<sift_wt>(r-1, c) - v2)*second_deriv_scale;
         float dxy = (img.at<sift_wt>(r+1, c+1) - img.at<sift_wt>(r+1, c-1) -
-                     img.at<sift_wt>(r-1, c+1) + img.at<sift_wt>(r-1, c-1)) * cross_deriv_scale;
+                    img.at<sift_wt>(r-1, c+1) + img.at<sift_wt>(r-1, c-1)) * cross_deriv_scale;
         float tr = dxx + dyy;
         float det = dxx * dyy - dxy * dxy;
 
@@ -535,24 +528,24 @@ public:
 
                 // find local extrema with pixel accuracy
                 if( std::abs(val) > threshold &&
-                   ((val > 0 && val >= currptr[c-1] && val >= currptr[c+1] &&
-                     val >= currptr[c-step-1] && val >= currptr[c-step] && val >= currptr[c-step+1] &&
-                     val >= currptr[c+step-1] && val >= currptr[c+step] && val >= currptr[c+step+1] &&
-                     val >= nextptr[c] && val >= nextptr[c-1] && val >= nextptr[c+1] &&
-                     val >= nextptr[c-step-1] && val >= nextptr[c-step] && val >= nextptr[c-step+1] &&
-                     val >= nextptr[c+step-1] && val >= nextptr[c+step] && val >= nextptr[c+step+1] &&
-                     val >= prevptr[c] && val >= prevptr[c-1] && val >= prevptr[c+1] &&
-                     val >= prevptr[c-step-1] && val >= prevptr[c-step] && val >= prevptr[c-step+1] &&
-                     val >= prevptr[c+step-1] && val >= prevptr[c+step] && val >= prevptr[c+step+1]) ||
-                    (val < 0 && val <= currptr[c-1] && val <= currptr[c+1] &&
-                     val <= currptr[c-step-1] && val <= currptr[c-step] && val <= currptr[c-step+1] &&
-                     val <= currptr[c+step-1] && val <= currptr[c+step] && val <= currptr[c+step+1] &&
-                     val <= nextptr[c] && val <= nextptr[c-1] && val <= nextptr[c+1] &&
-                     val <= nextptr[c-step-1] && val <= nextptr[c-step] && val <= nextptr[c-step+1] &&
-                     val <= nextptr[c+step-1] && val <= nextptr[c+step] && val <= nextptr[c+step+1] &&
-                     val <= prevptr[c] && val <= prevptr[c-1] && val <= prevptr[c+1] &&
-                     val <= prevptr[c-step-1] && val <= prevptr[c-step] && val <= prevptr[c-step+1] &&
-                     val <= prevptr[c+step-1] && val <= prevptr[c+step] && val <= prevptr[c+step+1])))
+                    ((val > 0 && val >= currptr[c-1] && val >= currptr[c+1] &&
+                      val >= currptr[c-step-1] && val >= currptr[c-step] && val >= currptr[c-step+1] &&
+                      val >= currptr[c+step-1] && val >= currptr[c+step] && val >= currptr[c+step+1] &&
+                      val >= nextptr[c] && val >= nextptr[c-1] && val >= nextptr[c+1] &&
+                      val >= nextptr[c-step-1] && val >= nextptr[c-step] && val >= nextptr[c-step+1] &&
+                      val >= nextptr[c+step-1] && val >= nextptr[c+step] && val >= nextptr[c+step+1] &&
+                      val >= prevptr[c] && val >= prevptr[c-1] && val >= prevptr[c+1] &&
+                      val >= prevptr[c-step-1] && val >= prevptr[c-step] && val >= prevptr[c-step+1] &&
+                      val >= prevptr[c+step-1] && val >= prevptr[c+step] && val >= prevptr[c+step+1]) ||
+                     (val < 0 && val <= currptr[c-1] && val <= currptr[c+1] &&
+                      val <= currptr[c-step-1] && val <= currptr[c-step] && val <= currptr[c-step+1] &&
+                      val <= currptr[c+step-1] && val <= currptr[c+step] && val <= currptr[c+step+1] &&
+                      val <= nextptr[c] && val <= nextptr[c-1] && val <= nextptr[c+1] &&
+                      val <= nextptr[c-step-1] && val <= nextptr[c-step] && val <= nextptr[c-step+1] &&
+                      val <= nextptr[c+step-1] && val <= nextptr[c+step] && val <= nextptr[c+step+1] &&
+                      val <= prevptr[c] && val <= prevptr[c-1] && val <= prevptr[c+1] &&
+                      val <= prevptr[c-step-1] && val <= prevptr[c-step] && val <= prevptr[c-step+1] &&
+                      val <= prevptr[c+step-1] && val <= prevptr[c+step] && val <= prevptr[c+step+1])))
                 {
                     int r1 = r, c1 = c, layer = i;
                     if( !adjustLocalExtrema(dog_pyr, kpt, o, layer, r1, c1,
@@ -604,7 +597,7 @@ private:
 // Detects features at extrema in DoG scale space.  Bad features are discarded
 // based on contrast and ratio of principal curvatures.
 void ASVSIFT_Impl::findScaleSpaceExtrema( const std::vector<Mat>& gauss_pyr, const std::vector<Mat>& dog_pyr,
-                                  std::vector<KeyPoint>& keypoints ) const
+                                          std::vector<KeyPoint>& keypoints ) const
 {
     const int nOctaves = (int)gauss_pyr.size()/(nOctaveLayers + 3);
     const int threshold = cvFloor(0.5 * contrastThreshold / nOctaveLayers * 255 * SIFT_FIXPT_SCALE);
@@ -620,26 +613,26 @@ void ASVSIFT_Impl::findScaleSpaceExtrema( const std::vector<Mat>& gauss_pyr, con
             const int step = (int)img.step1();
             const int rows = img.rows, cols = img.cols;
 
-            parallel_for_(Range(SIFT_IMG_BORDER, rows-SIFT_IMG_BORDER),
-                findScaleSpaceExtremaComputer(
-                    o, i, threshold, idx, step, cols,
-                    nOctaveLayers,
-                    contrastThreshold,
-                    edgeThreshold,
-                    sigma,
-                    gauss_pyr, dog_pyr, tls_kpts_struct));
+            parallel_for_( Range(SIFT_IMG_BORDER, rows-SIFT_IMG_BORDER),
+                           findScaleSpaceExtremaComputer(
+                                o, i, threshold, idx, step, cols,
+                                nOctaveLayers,
+                                contrastThreshold,
+                                edgeThreshold,
+                                sigma,
+                                gauss_pyr, dog_pyr, tls_kpts_struct));
         }
 
     std::vector<std::vector<KeyPoint>*> kpt_vecs;
     tls_kpts_struct.gather(kpt_vecs);
-    for (size_t i = 0; i < kpt_vecs.size(); ++i) {
+    for (size_t i = 0; i < kpt_vecs.size(); ++i) 
+    {
         keypoints.insert(keypoints.end(), kpt_vecs[i]->begin(), kpt_vecs[i]->end());
     }
 }
 
-
 static void calcSIFTDescriptor( const Mat& img, Point2f ptf, float ori, float scl,
-                               int d, int n, float* dst )
+                                int d, int n, float* dst )
 {
     Point pt(cvRound(ptf.x), cvRound(ptf.y));
     float cos_t = cosf(ori*(float)(CV_PI/180));
@@ -680,7 +673,7 @@ static void calcSIFTDescriptor( const Mat& img, Point2f ptf, float ori, float sc
             int r = pt.y + i, c = pt.x + j;
 
             if( rbin > -1 && rbin < d && cbin > -1 && cbin < d &&
-                r > 0 && r < rows - 1 && c > 0 && c < cols - 1 )
+                    r > 0 && r < rows - 1 && c > 0 && c < cols - 1 )
             {
                 float dx = (float)(img.at<sift_wt>(r, c+1) - img.at<sift_wt>(r, c-1));
                 float dy = (float)(img.at<sift_wt>(r-1, c) - img.at<sift_wt>(r+1, c));
@@ -705,235 +698,235 @@ static void calcSIFTDescriptor( const Mat& img, Point2f ptf, float ori, float sc
         const __m256 __bins_per_rad = _mm256_set1_ps(bins_per_rad);
         const __m256i __n = _mm256_set1_epi32(n);
         for( ; k <= len - 8; k+=8 )
-        {
-            __m256 __rbin = _mm256_loadu_ps(&RBin[k]);
-            __m256 __cbin = _mm256_loadu_ps(&CBin[k]);
-            __m256 __obin = _mm256_mul_ps(_mm256_sub_ps(_mm256_loadu_ps(&Ori[k]), __ori), __bins_per_rad);
-            __m256 __mag = _mm256_mul_ps(_mm256_loadu_ps(&Mag[k]), _mm256_loadu_ps(&W[k]));
+            {
+                    __m256 __rbin = _mm256_loadu_ps(&RBin[k]);
+                    __m256 __cbin = _mm256_loadu_ps(&CBin[k]);
+                    __m256 __obin = _mm256_mul_ps(_mm256_sub_ps(_mm256_loadu_ps(&Ori[k]), __ori), __bins_per_rad);
+                    __m256 __mag = _mm256_mul_ps(_mm256_loadu_ps(&Mag[k]), _mm256_loadu_ps(&W[k]));
 
-            __m256 __r0 = _mm256_floor_ps(__rbin);
-            __rbin = _mm256_sub_ps(__rbin, __r0);
-            __m256 __c0 = _mm256_floor_ps(__cbin);
-            __cbin = _mm256_sub_ps(__cbin, __c0);
-            __m256 __o0 = _mm256_floor_ps(__obin);
-            __obin = _mm256_sub_ps(__obin, __o0);
+                    __m256 __r0 = _mm256_floor_ps(__rbin);
+                    __rbin = _mm256_sub_ps(__rbin, __r0);
+                    __m256 __c0 = _mm256_floor_ps(__cbin);
+                    __cbin = _mm256_sub_ps(__cbin, __c0);
+                    __m256 __o0 = _mm256_floor_ps(__obin);
+                    __obin = _mm256_sub_ps(__obin, __o0);
 
-            __m256i __o0i = _mm256_cvtps_epi32(__o0);
-            __o0i = _mm256_add_epi32(__o0i, _mm256_and_si256(__n, _mm256_cmpgt_epi32(_mm256_setzero_si256(), __o0i)));
-            __o0i = _mm256_sub_epi32(__o0i, _mm256_andnot_si256(_mm256_cmpgt_epi32(__n, __o0i), __n));
+                    __m256i __o0i = _mm256_cvtps_epi32(__o0);
+                    __o0i = _mm256_add_epi32(__o0i, _mm256_and_si256(__n, _mm256_cmpgt_epi32(_mm256_setzero_si256(), __o0i)));
+                    __o0i = _mm256_sub_epi32(__o0i, _mm256_andnot_si256(_mm256_cmpgt_epi32(__n, __o0i), __n));
 
-            __m256 __v_r1 = _mm256_mul_ps(__mag, __rbin);
-            __m256 __v_r0 = _mm256_sub_ps(__mag, __v_r1);
+                    __m256 __v_r1 = _mm256_mul_ps(__mag, __rbin);
+                    __m256 __v_r0 = _mm256_sub_ps(__mag, __v_r1);
 
-            __m256 __v_rc11 = _mm256_mul_ps(__v_r1, __cbin);
-            __m256 __v_rc10 = _mm256_sub_ps(__v_r1, __v_rc11);
+                    __m256 __v_rc11 = _mm256_mul_ps(__v_r1, __cbin);
+                    __m256 __v_rc10 = _mm256_sub_ps(__v_r1, __v_rc11);
 
-            __m256 __v_rc01 = _mm256_mul_ps(__v_r0, __cbin);
-            __m256 __v_rc00 = _mm256_sub_ps(__v_r0, __v_rc01);
+                    __m256 __v_rc01 = _mm256_mul_ps(__v_r0, __cbin);
+                    __m256 __v_rc00 = _mm256_sub_ps(__v_r0, __v_rc01);
 
-            __m256 __v_rco111 = _mm256_mul_ps(__v_rc11, __obin);
-            __m256 __v_rco110 = _mm256_sub_ps(__v_rc11, __v_rco111);
+                    __m256 __v_rco111 = _mm256_mul_ps(__v_rc11, __obin);
+                    __m256 __v_rco110 = _mm256_sub_ps(__v_rc11, __v_rco111);
 
-            __m256 __v_rco101 = _mm256_mul_ps(__v_rc10, __obin);
-            __m256 __v_rco100 = _mm256_sub_ps(__v_rc10, __v_rco101);
+                    __m256 __v_rco101 = _mm256_mul_ps(__v_rc10, __obin);
+                    __m256 __v_rco100 = _mm256_sub_ps(__v_rc10, __v_rco101);
 
-            __m256 __v_rco011 = _mm256_mul_ps(__v_rc01, __obin);
-            __m256 __v_rco010 = _mm256_sub_ps(__v_rc01, __v_rco011);
+                    __m256 __v_rco011 = _mm256_mul_ps(__v_rc01, __obin);
+                    __m256 __v_rco010 = _mm256_sub_ps(__v_rc01, __v_rco011);
 
-            __m256 __v_rco001 = _mm256_mul_ps(__v_rc00, __obin);
-            __m256 __v_rco000 = _mm256_sub_ps(__v_rc00, __v_rco001);
+                    __m256 __v_rco001 = _mm256_mul_ps(__v_rc00, __obin);
+                    __m256 __v_rco000 = _mm256_sub_ps(__v_rc00, __v_rco001);
 
-            __m256i __one = _mm256_set1_epi32(1);
-            __m256i __idx = _mm256_add_epi32(
-                _mm256_mullo_epi32(
-                    _mm256_add_epi32(
-                        _mm256_mullo_epi32(_mm256_add_epi32(_mm256_cvtps_epi32(__r0), __one), _mm256_set1_epi32(d + 2)),
-                        _mm256_add_epi32(_mm256_cvtps_epi32(__c0), __one)),
-                    _mm256_set1_epi32(n + 2)),
-                __o0i);
+                    __m256i __one = _mm256_set1_epi32(1);
+                    __m256i __idx = _mm256_add_epi32(
+                            _mm256_mullo_epi32(
+                                _mm256_add_epi32(
+                                    _mm256_mullo_epi32(_mm256_add_epi32(_mm256_cvtps_epi32(__r0), __one), _mm256_set1_epi32(d + 2)),
+                                    _mm256_add_epi32(_mm256_cvtps_epi32(__c0), __one)),
+                                _mm256_set1_epi32(n + 2)),
+                            __o0i);
 
-            _mm256_store_si256((__m256i *)idx_buf, __idx);
+                    _mm256_store_si256((__m256i *)idx_buf, __idx);
 
-            _mm256_store_ps(&(rco_buf[0]),  __v_rco000);
-            _mm256_store_ps(&(rco_buf[8]),  __v_rco001);
-            _mm256_store_ps(&(rco_buf[16]), __v_rco010);
-            _mm256_store_ps(&(rco_buf[24]), __v_rco011);
-            _mm256_store_ps(&(rco_buf[32]), __v_rco100);
-            _mm256_store_ps(&(rco_buf[40]), __v_rco101);
-            _mm256_store_ps(&(rco_buf[48]), __v_rco110);
-            _mm256_store_ps(&(rco_buf[56]), __v_rco111);
-            #define HIST_SUM_HELPER(id)                                  \
-                hist[idx_buf[(id)]] += rco_buf[(id)];                    \
-                hist[idx_buf[(id)]+1] += rco_buf[8 + (id)];              \
-                hist[idx_buf[(id)]+(n+2)] += rco_buf[16 + (id)];         \
-                hist[idx_buf[(id)]+(n+3)] += rco_buf[24 + (id)];         \
-                hist[idx_buf[(id)]+(d+2)*(n+2)] += rco_buf[32 + (id)];   \
-                hist[idx_buf[(id)]+(d+2)*(n+2)+1] += rco_buf[40 + (id)]; \
-                hist[idx_buf[(id)]+(d+3)*(n+2)] += rco_buf[48 + (id)];   \
-                hist[idx_buf[(id)]+(d+3)*(n+2)+1] += rco_buf[56 + (id)];
+                    _mm256_store_ps(&(rco_buf[0]),  __v_rco000);
+                    _mm256_store_ps(&(rco_buf[8]),  __v_rco001);
+                    _mm256_store_ps(&(rco_buf[16]), __v_rco010);
+                    _mm256_store_ps(&(rco_buf[24]), __v_rco011);
+                    _mm256_store_ps(&(rco_buf[32]), __v_rco100);
+                    _mm256_store_ps(&(rco_buf[40]), __v_rco101);
+                    _mm256_store_ps(&(rco_buf[48]), __v_rco110);
+                    _mm256_store_ps(&(rco_buf[56]), __v_rco111);
+#define HIST_SUM_HELPER(id)                                  \
+                    hist[idx_buf[(id)]] += rco_buf[(id)];                    \
+                    hist[idx_buf[(id)]+1] += rco_buf[8 + (id)];              \
+                    hist[idx_buf[(id)]+(n+2)] += rco_buf[16 + (id)];         \
+                    hist[idx_buf[(id)]+(n+3)] += rco_buf[24 + (id)];         \
+                    hist[idx_buf[(id)]+(d+2)*(n+2)] += rco_buf[32 + (id)];   \
+                    hist[idx_buf[(id)]+(d+2)*(n+2)+1] += rco_buf[40 + (id)]; \
+                    hist[idx_buf[(id)]+(d+3)*(n+2)] += rco_buf[48 + (id)];   \
+                    hist[idx_buf[(id)]+(d+3)*(n+2)+1] += rco_buf[56 + (id)];
 
-            HIST_SUM_HELPER(0);
-            HIST_SUM_HELPER(1);
-            HIST_SUM_HELPER(2);
-            HIST_SUM_HELPER(3);
-            HIST_SUM_HELPER(4);
-            HIST_SUM_HELPER(5);
-            HIST_SUM_HELPER(6);
-            HIST_SUM_HELPER(7);
+                    HIST_SUM_HELPER(0);
+                    HIST_SUM_HELPER(1);
+                    HIST_SUM_HELPER(2);
+                    HIST_SUM_HELPER(3);
+                    HIST_SUM_HELPER(4);
+                    HIST_SUM_HELPER(5);
+                    HIST_SUM_HELPER(6);
+                    HIST_SUM_HELPER(7);
 
-            #undef HIST_SUM_HELPER
-        }
-    }
+#undef HIST_SUM_HELPER
+                }
+            }
 #endif
-    for( ; k < len; k++ )
-    {
-        float rbin = RBin[k], cbin = CBin[k];
-        float obin = (Ori[k] - ori)*bins_per_rad;
-        float mag = Mag[k]*W[k];
+            for( ; k < len; k++ )
+            {
+                float rbin = RBin[k], cbin = CBin[k];
+                float obin = (Ori[k] - ori)*bins_per_rad;
+                float mag = Mag[k]*W[k];
 
-        int r0 = cvFloor( rbin );
-        int c0 = cvFloor( cbin );
-        int o0 = cvFloor( obin );
-        rbin -= r0;
-        cbin -= c0;
-        obin -= o0;
+                int r0 = cvFloor( rbin );
+                int c0 = cvFloor( cbin );
+                int o0 = cvFloor( obin );
+                rbin -= r0;
+                cbin -= c0;
+                obin -= o0;
 
-        if( o0 < 0 )
-            o0 += n;
-        if( o0 >= n )
-            o0 -= n;
+                if( o0 < 0 )
+                    o0 += n;
+                if( o0 >= n )
+                    o0 -= n;
 
-        // histogram update using tri-linear interpolation
-        float v_r1 = mag*rbin, v_r0 = mag - v_r1;
-        float v_rc11 = v_r1*cbin, v_rc10 = v_r1 - v_rc11;
-        float v_rc01 = v_r0*cbin, v_rc00 = v_r0 - v_rc01;
-        float v_rco111 = v_rc11*obin, v_rco110 = v_rc11 - v_rco111;
-        float v_rco101 = v_rc10*obin, v_rco100 = v_rc10 - v_rco101;
-        float v_rco011 = v_rc01*obin, v_rco010 = v_rc01 - v_rco011;
-        float v_rco001 = v_rc00*obin, v_rco000 = v_rc00 - v_rco001;
+                // histogram update using tri-linear interpolation
+                float v_r1 = mag*rbin, v_r0 = mag - v_r1;
+                float v_rc11 = v_r1*cbin, v_rc10 = v_r1 - v_rc11;
+                float v_rc01 = v_r0*cbin, v_rc00 = v_r0 - v_rc01;
+                float v_rco111 = v_rc11*obin, v_rco110 = v_rc11 - v_rco111;
+                float v_rco101 = v_rc10*obin, v_rco100 = v_rc10 - v_rco101;
+                float v_rco011 = v_rc01*obin, v_rco010 = v_rc01 - v_rco011;
+                float v_rco001 = v_rc00*obin, v_rco000 = v_rc00 - v_rco001;
 
-        int idx = ((r0+1)*(d+2) + c0+1)*(n+2) + o0;
-        hist[idx] += v_rco000;
-        hist[idx+1] += v_rco001;
-        hist[idx+(n+2)] += v_rco010;
-        hist[idx+(n+3)] += v_rco011;
-        hist[idx+(d+2)*(n+2)] += v_rco100;
-        hist[idx+(d+2)*(n+2)+1] += v_rco101;
-        hist[idx+(d+3)*(n+2)] += v_rco110;
-        hist[idx+(d+3)*(n+2)+1] += v_rco111;
-    }
+                int idx = ((r0+1)*(d+2) + c0+1)*(n+2) + o0;
+                hist[idx] += v_rco000;
+                hist[idx+1] += v_rco001;
+                hist[idx+(n+2)] += v_rco010;
+                hist[idx+(n+3)] += v_rco011;
+                hist[idx+(d+2)*(n+2)] += v_rco100;
+                hist[idx+(d+2)*(n+2)+1] += v_rco101;
+                hist[idx+(d+3)*(n+2)] += v_rco110;
+                hist[idx+(d+3)*(n+2)+1] += v_rco111;
+            }
 
-    // finalize histogram, since the orientation histograms are circular
-    for( i = 0; i < d; i++ )
-        for( j = 0; j < d; j++ )
-        {
-            int idx = ((i+1)*(d+2) + (j+1))*(n+2);
-            hist[idx] += hist[idx+n];
-            hist[idx+1] += hist[idx+n+1];
-            for( k = 0; k < n; k++ )
-                dst[(i*d + j)*n + k] = hist[idx+k];
-        }
-    // copy histogram to the descriptor,
-    // apply hysteresis thresholding
-    // and scale the result, so that it can be easily converted
-    // to byte array
-    float nrm2 = 0;
-    len = d*d*n;
-    k = 0;
+            // finalize histogram, since the orientation histograms are circular
+            for( i = 0; i < d; i++ )
+                for( j = 0; j < d; j++ )
+                {
+                    int idx = ((i+1)*(d+2) + (j+1))*(n+2);
+                    hist[idx] += hist[idx+n];
+                    hist[idx+1] += hist[idx+n+1];
+                    for( k = 0; k < n; k++ )
+                        dst[(i*d + j)*n + k] = hist[idx+k];
+                }
+            // copy histogram to the descriptor,
+            // apply hysteresis thresholding
+            // and scale the result, so that it can be easily converted
+            // to byte array
+            float nrm2 = 0;
+            len = d*d*n;
+            k = 0;
 #if CV_AVX2
-    if( USE_AVX2 )
-    {
-        float CV_DECL_ALIGNED(32) nrm2_buf[8];
-        __m256 __nrm2 = _mm256_setzero_ps();
-        __m256 __dst;
-        for( ; k <= len - 8; k += 8 )
-        {
-            __dst = _mm256_loadu_ps(&dst[k]);
+            if( USE_AVX2 )
+            {
+                float CV_DECL_ALIGNED(32) nrm2_buf[8];
+                __m256 __nrm2 = _mm256_setzero_ps();
+                __m256 __dst;
+                for( ; k <= len - 8; k += 8 )
+                {
+                    __dst = _mm256_loadu_ps(&dst[k]);
 #if CV_FMA3
-            __nrm2 = _mm256_fmadd_ps(__dst, __dst, __nrm2);
+                    __nrm2 = _mm256_fmadd_ps(__dst, __dst, __nrm2);
 #else
-            __nrm2 = _mm256_add_ps(__nrm2, _mm256_mul_ps(__dst, __dst));
+                    __nrm2 = _mm256_add_ps(__nrm2, _mm256_mul_ps(__dst, __dst));
 #endif
-        }
-        _mm256_store_ps(nrm2_buf, __nrm2);
-        nrm2 = nrm2_buf[0] + nrm2_buf[1] + nrm2_buf[2] + nrm2_buf[3] +
-               nrm2_buf[4] + nrm2_buf[5] + nrm2_buf[6] + nrm2_buf[7];
-    }
+                }
+                _mm256_store_ps(nrm2_buf, __nrm2);
+                nrm2 = nrm2_buf[0] + nrm2_buf[1] + nrm2_buf[2] + nrm2_buf[3] +
+                    nrm2_buf[4] + nrm2_buf[5] + nrm2_buf[6] + nrm2_buf[7];
+            }
 #endif
-    for( ; k < len; k++ )
-        nrm2 += dst[k]*dst[k];
+            for( ; k < len; k++ )
+                nrm2 += dst[k]*dst[k];
 
-    float thr = std::sqrt(nrm2)*SIFT_DESCR_MAG_THR;
+            float thr = std::sqrt(nrm2)*SIFT_DESCR_MAG_THR;
 
-    i = 0, nrm2 = 0;
+            i = 0, nrm2 = 0;
 #if 0 //CV_AVX2
-    // This code cannot be enabled because it sums nrm2 in a different order,
-    // thus producing slightly different results
-    if( USE_AVX2 )
-    {
-        float CV_DECL_ALIGNED(32) nrm2_buf[8];
-        __m256 __dst;
-        __m256 __nrm2 = _mm256_setzero_ps();
-        __m256 __thr = _mm256_set1_ps(thr);
-        for( ; i <= len - 8; i += 8 )
-        {
-            __dst = _mm256_loadu_ps(&dst[i]);
-            __dst = _mm256_min_ps(__dst, __thr);
-            _mm256_storeu_ps(&dst[i], __dst);
+      // This code cannot be enabled because it sums nrm2 in a different order,
+      // thus producing slightly different results
+            if( USE_AVX2 )
+            {
+                float CV_DECL_ALIGNED(32) nrm2_buf[8];
+                __m256 __dst;
+                __m256 __nrm2 = _mm256_setzero_ps();
+                __m256 __thr = _mm256_set1_ps(thr);
+                for( ; i <= len - 8; i += 8 )
+                {
+                    __dst = _mm256_loadu_ps(&dst[i]);
+                    __dst = _mm256_min_ps(__dst, __thr);
+                    _mm256_storeu_ps(&dst[i], __dst);
 #if CV_FMA3
-            __nrm2 = _mm256_fmadd_ps(__dst, __dst, __nrm2);
+                    __nrm2 = _mm256_fmadd_ps(__dst, __dst, __nrm2);
 #else
-            __nrm2 = _mm256_add_ps(__nrm2, _mm256_mul_ps(__dst, __dst));
+                    __nrm2 = _mm256_add_ps(__nrm2, _mm256_mul_ps(__dst, __dst));
 #endif
-        }
-        _mm256_store_ps(nrm2_buf, __nrm2);
-        nrm2 = nrm2_buf[0] + nrm2_buf[1] + nrm2_buf[2] + nrm2_buf[3] +
-               nrm2_buf[4] + nrm2_buf[5] + nrm2_buf[6] + nrm2_buf[7];
-    }
+                }
+                _mm256_store_ps(nrm2_buf, __nrm2);
+                nrm2 = nrm2_buf[0] + nrm2_buf[1] + nrm2_buf[2] + nrm2_buf[3] +
+                    nrm2_buf[4] + nrm2_buf[5] + nrm2_buf[6] + nrm2_buf[7];
+            }
 #endif
-    for( ; i < len; i++ )
-    {
-        float val = std::min(dst[i], thr);
-        dst[i] = val;
-        nrm2 += val*val;
-    }
-    nrm2 = SIFT_INT_DESCR_FCTR/std::max(std::sqrt(nrm2), FLT_EPSILON);
+            for( ; i < len; i++ )
+            {
+                float val = std::min(dst[i], thr);
+                dst[i] = val;
+                nrm2 += val*val;
+            }
+            nrm2 = SIFT_INT_DESCR_FCTR/std::max(std::sqrt(nrm2), FLT_EPSILON);
 
 #if 1
-    k = 0;
+            k = 0;
 #if CV_AVX2
-    if( USE_AVX2 )
-    {
-        __m256 __dst;
-        __m256 __min = _mm256_setzero_ps();
-        __m256 __max = _mm256_set1_ps(255.0f); // max of uchar
-        __m256 __nrm2 = _mm256_set1_ps(nrm2);
-        for( k = 0; k <= len - 8; k+=8 )
-        {
-            __dst = _mm256_loadu_ps(&dst[k]);
-            __dst = _mm256_min_ps(_mm256_max_ps(_mm256_round_ps(_mm256_mul_ps(__dst, __nrm2), _MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC), __min), __max);
-            _mm256_storeu_ps(&dst[k], __dst);
-        }
-    }
+            if( USE_AVX2 )
+            {
+                __m256 __dst;
+                __m256 __min = _mm256_setzero_ps();
+                __m256 __max = _mm256_set1_ps(255.0f); // max of uchar
+                __m256 __nrm2 = _mm256_set1_ps(nrm2);
+                for( k = 0; k <= len - 8; k+=8 )
+                {
+                    __dst = _mm256_loadu_ps(&dst[k]);
+                    __dst = _mm256_min_ps(_mm256_max_ps(_mm256_round_ps(_mm256_mul_ps(__dst, __nrm2), _MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC), __min), __max);
+                    _mm256_storeu_ps(&dst[k], __dst);
+                }
+            }
 #endif
-    for( ; k < len; k++ )
-    {
-        dst[k] = saturate_cast<uchar>(dst[k]*nrm2);
-    }
+            for( ; k < len; k++ )
+            {
+                dst[k] = saturate_cast<uchar>(dst[k]*nrm2);
+            }
 #else
-    float nrm1 = 0;
-    for( k = 0; k < len; k++ )
-    {
-        dst[k] *= nrm2;
-        nrm1 += dst[k];
-    }
-    nrm1 = 1.f/std::max(nrm1, FLT_EPSILON);
-    for( k = 0; k < len; k++ )
-    {
-        dst[k] = std::sqrt(dst[k] * nrm1);//saturate_cast<uchar>(std::sqrt(dst[k] * nrm1)*SIFT_INT_DESCR_FCTR);
-    }
+            float nrm1 = 0;
+            for( k = 0; k < len; k++ )
+            {
+                dst[k] *= nrm2;
+                nrm1 += dst[k];
+            }
+            nrm1 = 1.f/std::max(nrm1, FLT_EPSILON);
+            for( k = 0; k < len; k++ )
+            {
+                dst[k] = std::sqrt(dst[k] * nrm1);//saturate_cast<uchar>(std::sqrt(dst[k] * nrm1)*SIFT_INT_DESCR_FCTR);
+            }
 #endif
-}
+        }
 
 class calcDescriptorsComputer : public ParallelLoopBody
 {
@@ -971,6 +964,7 @@ public:
             Point2f ptf(kpt.pt.x*scale, kpt.pt.y*scale);
             const Mat& img = gpyr[(octave - firstOctave)*(nOctaveLayers + 3) + layer];
             float angle = 360.f - kpt.angle;
+
             if(std::abs(angle - 360.f) < FLT_EPSILON)
                 angle = 0.f;
 
@@ -991,20 +985,21 @@ static void calcDescriptors(const std::vector<Mat>& gpyr, const std::vector<KeyP
                             float scalingRatio)
 {
     parallel_for_( Range( 0, static_cast<int>( keypoints.size() ) ), 
-                   calcDescriptorsComputer( gpyr, keypoints, descriptors, nOctaveLayers, firstOctave, 
-                                            scalingRatio 
-                                          ) 
-                 );
+                   calcDescriptorsComputer( gpyr, keypoints, descriptors, 
+                                            nOctaveLayers, firstOctave, 
+                                            scalingRatio ) );
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
 ASVSIFT_Impl::ASVSIFT_Impl( int _nfeatures, int _nOctaveLayers,
-           double _contrastThreshold, double _edgeThreshold, double _sigma, 
-           int _nSampledScales, float _scalingRatioSmallest, float _scalingRatioLargest )
+                            double _contrastThreshold, double _edgeThreshold, double _sigma, 
+                            int _nSampledScales, 
+                            float _scalingRatioSmallest, float _scalingRatioLargest )
     : nfeatures(_nfeatures), nOctaveLayers(_nOctaveLayers),
-    contrastThreshold(_contrastThreshold), edgeThreshold(_edgeThreshold), sigma(_sigma), 
-        nSampledScales(_nSampledScales), scalingRatioSmallest(_scalingRatioSmallest), scalingRatioLargest(_scalingRatioLargest)
+      contrastThreshold(_contrastThreshold), edgeThreshold(_edgeThreshold), sigma(_sigma), 
+      nSampledScales(_nSampledScales), 
+      scalingRatioSmallest(_scalingRatioSmallest), scalingRatioLargest(_scalingRatioLargest)
 {
 }
 
@@ -1023,11 +1018,10 @@ int ASVSIFT_Impl::defaultNorm() const
     return NORM_L2;
 }
 
-
 void ASVSIFT_Impl::detectAndCompute(InputArray _image, InputArray _mask,
-                      std::vector<KeyPoint>& keypoints,
-                      OutputArray _descriptors,
-                      bool useProvidedKeypoints)
+                                   std::vector<KeyPoint>& keypoints,
+                                   OutputArray _descriptors,
+                                   bool useProvidedKeypoints)
 {
     int firstOctave = -1, actualNOctaves = 0, actualNLayers = 0;
     Mat image = _image.getMat(), mask = _mask.getMat();
@@ -1110,64 +1104,62 @@ void ASVSIFT_Impl::detectAndCompute(InputArray _image, InputArray _mask,
 
         for (int i = 0; i < nSampledScales; i++)
         { 
-                //_descriptors.create( (int)keypoints.size(), dsize, CV_32F );
-                Mat descriptorsAtScale( (int)keypoints.size(), dsize, CV_32F );
+            Mat descriptorsAtScale( (int)keypoints.size(), dsize, CV_32F );
 
-                float scalingRatio = i * scalingRatioIncrement + scalingRatioSmallest;
+            float scalingRatio = i * scalingRatioIncrement + scalingRatioSmallest;
 
-                calcDescriptors(gpyr, keypoints, descriptorsAtScale, nOctaveLayers, firstOctave,
-                                scalingRatio);
+            calcDescriptors(gpyr, keypoints, descriptorsAtScale, nOctaveLayers, firstOctave,
+                            scalingRatio);
 
-                initialDescFamily.push_back(descriptorsAtScale);
+            initialDescFamily.push_back(descriptorsAtScale);
         }
-
 
         std::vector<Mat> stabilityDescFamily;
 
         for (int i = 0; i < (int)initialDescFamily.size(); i++)
         {
-                for (int j = i + 1; j < (int)initialDescFamily.size(); j++)
-                {
-                        Mat stabilityDescriptors( (int)keypoints.size(), dsize, CV_32F );
+            for (int j = i + 1; j < (int)initialDescFamily.size(); j++)
+            {
+                Mat stabilityDescriptors( (int)keypoints.size(), dsize, CV_32F );
 
-                        absdiff( initialDescFamily[i], initialDescFamily[j], stabilityDescriptors );
+                absdiff( initialDescFamily[i], initialDescFamily[j], stabilityDescriptors );
 
-                        stabilityDescFamily.push_back(stabilityDescriptors);
-                }
+                stabilityDescFamily.push_back(stabilityDescriptors);
+            }
         }
 
         for (int i = 0; i < (int)stabilityDescFamily.size(); i++)
         {
-                Mat stabilityDescriptors = stabilityDescFamily[i];
+            Mat stabilityDescriptors = stabilityDescFamily[i];
 
-                for (int j = 0; j < stabilityDescriptors.rows; j++)
+            for (int j = 0; j < stabilityDescriptors.rows; j++)
+            {
+                float localThreshold;
+                Mat desc = stabilityDescriptors.row(j).clone();
+
+                cv::sort(desc, desc, SORT_EVERY_ROW);
+
+                localThreshold = desc.at<float>(0, desc.cols / 2);
+
+                for (int k = 0; k < dsize; k++)
                 {
-                        float localThreshold;
-                        Mat desc = stabilityDescriptors.row(j).clone();
-
-                        cv::sort(desc, desc, SORT_EVERY_ROW);
-
-                        localThreshold = desc.at<float>(0, desc.cols / 2);
-
-                        for (int k = 0; k < dsize; k++)
-                        {
-                                if (stabilityDescriptors.at<float>(j, k) < localThreshold)
-                                {
-                                        stabilityDescriptors.at<float>(j, k) = 1.0f;
-                                }
-                                else
-                                {
-                                        stabilityDescriptors.at<float>(j, k) = 0.0f;
-                                }
-                        }
+                    if (stabilityDescriptors.at<float>(j, k) < localThreshold)
+                    {
+                        stabilityDescriptors.at<float>(j, k) = 1.0f;
+                    }
+                    else
+                    {
+                        stabilityDescriptors.at<float>(j, k) = 0.0f;
+                    }
                 }
+            }
         }
 
         Mat asvDescriptors = stabilityDescFamily[0].clone();
 
         for (int i = 1; i < (int)stabilityDescFamily.size(); i++)
         {
-                add(asvDescriptors, stabilityDescFamily[i], asvDescriptors);
+            add(asvDescriptors, stabilityDescFamily[i], asvDescriptors);
         }
 
         _descriptors.assign(asvDescriptors);
