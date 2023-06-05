@@ -89,7 +89,10 @@ public:
     */
     CV_WRAP static Ptr<ASVSIFT> create(int nfeatures = 0, int nOctaveLayers = 3,
         double contrastThreshold = 0.04, double edgeThreshold = 10,
-        double sigma = 1.6);
+        double sigma = 1.6,
+        int nSampledScales = 10,
+        float scalingRatioSmallest = 1.0f / 6.0f,
+        float scalingRatioLargest = 3.0f);
 };
 
 typedef ASVSIFT ASVSiftFeatureDetector;
