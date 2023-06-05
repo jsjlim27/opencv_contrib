@@ -11,16 +11,16 @@ namespace xfeatures2d
 {
 
 /*!
- SIFT implementation.
-
- The class implements SIFT algorithm by D. Lowe.
  */
 class ASVSIFT_Impl : public ASVSIFT
 {
 public:
     explicit ASVSIFT_Impl( int nfeatures = 0, int nOctaveLayers = 3,
                           double contrastThreshold = 0.04, double edgeThreshold = 10,
-                          double sigma = 1.6);
+                          double sigma = 1.6,
+                          int nSampledScales = 10, 
+                          float scalingRatioSmallest = 1.0f / 6.0f,
+                          float scalingRatioLargest = 3.0f);
 
     //! returns the descriptor size in floats (128)
     int descriptorSize() const CV_OVERRIDE;
@@ -49,12 +49,17 @@ protected:
     CV_PROP_RW double contrastThreshold;
     CV_PROP_RW double edgeThreshold;
     CV_PROP_RW double sigma;
+    CV_PROP_RW int nSampledScales;
+    CV_PROP_RW float scalingRatioSmallest;
+    CV_PROP_RW float scalingRatioLargest;
 };
 
 Ptr<ASVSIFT> ASVSIFT::create( int _nfeatures, int _nOctaveLayers,
-                     double _contrastThreshold, double _edgeThreshold, double _sigma )
+                     double _contrastThreshold, double _edgeThreshold, double _sigma, 
+                     int _nSampledScales, float _scalingRatioSmallest, float _scalingRatioLargest )
 {
-    return makePtr<ASVSIFT_Impl>(_nfeatures, _nOctaveLayers, _contrastThreshold, _edgeThreshold, _sigma);
+    return makePtr<ASVSIFT_Impl>(_nfeatures, _nOctaveLayers, _contrastThreshold, _edgeThreshold, _sigma, 
+                                 _nSampledScales, _scalingRatioSmallest, _scalingRatioLargest );
 }
 
 /******************************* Defs and macros *****************************/
@@ -951,21 +956,75 @@ public:
 
         static const int d = SIFT_DESCR_WIDTH, n = SIFT_DESCR_HIST_BINS;
 
-        for ( int i = begin; i<end; i++ )
+        for ( int i = begin; i < end; i++ )
         {
             KeyPoint kpt = keypoints[i];
             int octave, layer;
             float scale;
-            unpackOctave(kpt, octave, layer, scale);
-            CV_Assert(octave >= firstOctave && layer <= nOctaveLayers+2);
-            float size=kpt.size*scale;
-            Point2f ptf(kpt.pt.x*scale, kpt.pt.y*scale);
-            const Mat& img = gpyr[(octave - firstOctave)*(nOctaveLayers + 3) + layer];
 
-            float angle = 360.f - kpt.angle;
-            if(std::abs(angle - 360.f) < FLT_EPSILON)
-                angle = 0.f;
-            calcSIFTDescriptor(img, ptf, angle, size*0.5f, d, n, descriptors.ptr<float>((int)i));
+            unpackOctave(kpt, octave, layer, scale);
+
+            CV_Assert(octave >= firstOctave && layer <= nOctaveLayers+2);
+
+            Mat neighborhoodSamples(nSampledScales, descriptorSize(), CV_32F);
+
+            float scaleIncrement = (scalingRatioLargest * scale - scalingRatioSmallest * scale) / (nSampledScales - 1);
+            for ( int j = 0; j < nSampledScales; j++ )
+            {
+                float currentScale = (scalingRatioSmallest * scale) + (scaleIncrement * j);
+                float size = kpt.size * currentScale;
+                Point2f ptf(kpt.pt.x*scale, kpt.pt.y*scale);
+                const Mat& img = gpyr[(octave - firstOctave)*(nOctaveLayers + 3) + layer];
+                float angle = 360.f - kpt.angle;
+                if(std::abs(angle - 360.f) < FLT_EPSILON)
+                    angle = 0.f;
+
+                calcSIFTDescriptor(img, ptf, angle, size*0.5f, d, n, neighborhoodSamples.ptr<float>((int)j));
+            }
+
+            Mat neighborhoodSamplePairsABSDiff;
+
+            for (int j = 0; j < neighborhoodSamples.rows; j++)
+            {
+                    Mat sample1 = neighborhoodSamples.row(j);
+
+                    for (int k = j + 1; k < neighborhoodSamples.rows; k++)
+                    {
+                            Mat sample2 = neighborhoodSamples.row(k);
+                            Mat sampleOut(1, descriptorSize(), CV_32F);
+
+                            absdiff( sample2, sample2, sampleOut);
+
+                            neighborhoodSamplePairsABSDiff.push_back(sampleOut);
+                    }
+            }
+
+            Mat neighborhoodSamplePairsThreshold(neighborhoodSamplePairsABSDiff.rows, neighborhoodSamplePairsABSDiff.cols, CV_32S);
+
+            for (int j = 0; j < neighborhoodSamplePairsABSDiff.rows; j++)
+            {
+                    Mat sample = neighborhoodSamplePairsABSDiff.row(j).clone();
+                    cv::sort(sample, sample, cv::SORT_EVERY_ROW);
+
+                    float localThreshold = sample.at<float>(0, sample.cols / 2);
+
+                    for (int k = 0; k < neighborhoodSamplePairsABSDiff.cols; k++)
+                    {
+                            if (neighborhoodSamplePairsABSDiff.at<float>(j, k) < localThreshold)
+                            {
+                                    neighborhoodSamplePairsThreshold.at<int>(j, k) = 1;
+                            }
+                            else
+                            {
+                                    neighborhoodSamplePairsThreshold.at<int>(j, k) = 0;
+                            }
+                    }
+            }
+
+            Mat asvDescriptor;
+            cv::reduce(neighborhoodSamplePairsThreshold, asvDescriptor, cv::REDUCE_SUM, CV_32F);
+
+            descriptors.row(i) = asvDescriptor;
         }
     }
 private:
@@ -985,9 +1044,9 @@ static void calcDescriptors(const std::vector<Mat>& gpyr, const std::vector<KeyP
 //////////////////////////////////////////////////////////////////////////////////////////
 
 ASVSIFT_Impl::ASVSIFT_Impl( int _nfeatures, int _nOctaveLayers,
-           double _contrastThreshold, double _edgeThreshold, double _sigma )
+           double _contrastThreshold, double _edgeThreshold, double _sigma, int _nSampledScales )
     : nfeatures(_nfeatures), nOctaveLayers(_nOctaveLayers),
-    contrastThreshold(_contrastThreshold), edgeThreshold(_edgeThreshold), sigma(_sigma)
+    contrastThreshold(_contrastThreshold), edgeThreshold(_edgeThreshold), sigma(_sigma), nSampledScales(_nSampledScales)
 {
 }
 
@@ -1087,7 +1146,7 @@ void ASVSIFT_Impl::detectAndCompute(InputArray _image, InputArray _mask,
     {
         //t = (double)getTickCount();
         int dsize = descriptorSize();
-        _descriptors.create((int)keypoints.size(), dsize, CV_32F);
+        _descriptors.create( (int)keypoints.size(), dsize, CV_32F );
         Mat descriptors = _descriptors.getMat();
 
         calcDescriptors(gpyr, keypoints, descriptors, nOctaveLayers, firstOctave);
