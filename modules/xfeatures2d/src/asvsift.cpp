@@ -1,8 +1,8 @@
 #include "precomp.hpp"
 #include <iostream>
 #include <stdarg.h>
+//#include <opencv2/cor.hpp>
 #include <opencv2/core/hal/hal.hpp>
-
 #include <opencv2/core/utils/tls.hpp>
 
 namespace cv
@@ -942,12 +942,14 @@ public:
                             const std::vector<KeyPoint>& _keypoints,
                             Mat& _descriptors,
                             int _nOctaveLayers,
-                            int _firstOctave)
+                            int _firstOctave,
+                            float _scalingRatio)
         : gpyr(_gpyr),
           keypoints(_keypoints),
           descriptors(_descriptors),
           nOctaveLayers(_nOctaveLayers),
-          firstOctave(_firstOctave) { }
+          firstOctave(_firstOctave),
+          scalingRatio(_scalingRatio) { }
 
     void operator()( const cv::Range& range ) const CV_OVERRIDE
     {
@@ -961,70 +963,18 @@ public:
             KeyPoint kpt = keypoints[i];
             int octave, layer;
             float scale;
-
             unpackOctave(kpt, octave, layer, scale);
-
             CV_Assert(octave >= firstOctave && layer <= nOctaveLayers+2);
 
-            Mat neighborhoodSamples(nSampledScales, descriptorSize(), CV_32F);
+            scale *= scalingRatio;
+            float size = kpt.size * scale;
+            Point2f ptf(kpt.pt.x*scale, kpt.pt.y*scale);
+            const Mat& img = gpyr[(octave - firstOctave)*(nOctaveLayers + 3) + layer];
+            float angle = 360.f - kpt.angle;
+            if(std::abs(angle - 360.f) < FLT_EPSILON)
+                angle = 0.f;
 
-            float scaleIncrement = (scalingRatioLargest * scale - scalingRatioSmallest * scale) / (nSampledScales - 1);
-            for ( int j = 0; j < nSampledScales; j++ )
-            {
-                float currentScale = (scalingRatioSmallest * scale) + (scaleIncrement * j);
-                float size = kpt.size * currentScale;
-                Point2f ptf(kpt.pt.x*scale, kpt.pt.y*scale);
-                const Mat& img = gpyr[(octave - firstOctave)*(nOctaveLayers + 3) + layer];
-                float angle = 360.f - kpt.angle;
-                if(std::abs(angle - 360.f) < FLT_EPSILON)
-                    angle = 0.f;
-
-                calcSIFTDescriptor(img, ptf, angle, size*0.5f, d, n, neighborhoodSamples.ptr<float>((int)j));
-            }
-
-            Mat neighborhoodSamplePairsABSDiff;
-
-            for (int j = 0; j < neighborhoodSamples.rows; j++)
-            {
-                    Mat sample1 = neighborhoodSamples.row(j);
-
-                    for (int k = j + 1; k < neighborhoodSamples.rows; k++)
-                    {
-                            Mat sample2 = neighborhoodSamples.row(k);
-                            Mat sampleOut(1, descriptorSize(), CV_32F);
-
-                            absdiff( sample2, sample2, sampleOut);
-
-                            neighborhoodSamplePairsABSDiff.push_back(sampleOut);
-                    }
-            }
-
-            Mat neighborhoodSamplePairsThreshold(neighborhoodSamplePairsABSDiff.rows, neighborhoodSamplePairsABSDiff.cols, CV_32S);
-
-            for (int j = 0; j < neighborhoodSamplePairsABSDiff.rows; j++)
-            {
-                    Mat sample = neighborhoodSamplePairsABSDiff.row(j).clone();
-                    cv::sort(sample, sample, cv::SORT_EVERY_ROW);
-
-                    float localThreshold = sample.at<float>(0, sample.cols / 2);
-
-                    for (int k = 0; k < neighborhoodSamplePairsABSDiff.cols; k++)
-                    {
-                            if (neighborhoodSamplePairsABSDiff.at<float>(j, k) < localThreshold)
-                            {
-                                    neighborhoodSamplePairsThreshold.at<int>(j, k) = 1;
-                            }
-                            else
-                            {
-                                    neighborhoodSamplePairsThreshold.at<int>(j, k) = 0;
-                            }
-                    }
-            }
-
-            Mat asvDescriptor;
-            cv::reduce(neighborhoodSamplePairsThreshold, asvDescriptor, cv::REDUCE_SUM, CV_32F);
-
-            descriptors.row(i) = asvDescriptor;
+            calcSIFTDescriptor(img, ptf, angle, size*0.5f, d, n, descriptors.ptr<float>((int)i));
         }
     }
 private:
@@ -1033,20 +983,28 @@ private:
     Mat& descriptors;
     int nOctaveLayers;
     int firstOctave;
+    float scalingRatio;
 };
 
 static void calcDescriptors(const std::vector<Mat>& gpyr, const std::vector<KeyPoint>& keypoints,
-                            Mat& descriptors, int nOctaveLayers, int firstOctave )
+                            Mat& descriptors, int nOctaveLayers, int firstOctave,
+                            float scalingRatio)
 {
-    parallel_for_(Range(0, static_cast<int>(keypoints.size())), calcDescriptorsComputer(gpyr, keypoints, descriptors, nOctaveLayers, firstOctave));
+    parallel_for_( Range( 0, static_cast<int>( keypoints.size() ) ), 
+                   calcDescriptorsComputer( gpyr, keypoints, descriptors, nOctaveLayers, firstOctave, 
+                                            scalingRatio 
+                                          ) 
+                 );
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
 ASVSIFT_Impl::ASVSIFT_Impl( int _nfeatures, int _nOctaveLayers,
-           double _contrastThreshold, double _edgeThreshold, double _sigma, int _nSampledScales )
+           double _contrastThreshold, double _edgeThreshold, double _sigma, 
+           int _nSampledScales, float _scalingRatioSmallest, float _scalingRatioLargest )
     : nfeatures(_nfeatures), nOctaveLayers(_nOctaveLayers),
-    contrastThreshold(_contrastThreshold), edgeThreshold(_edgeThreshold), sigma(_sigma), nSampledScales(_nSampledScales)
+    contrastThreshold(_contrastThreshold), edgeThreshold(_edgeThreshold), sigma(_sigma), 
+        nSampledScales(_nSampledScales), scalingRatioSmallest(_scalingRatioSmallest), scalingRatioLargest(_scalingRatioLargest)
 {
 }
 
@@ -1144,12 +1102,75 @@ void ASVSIFT_Impl::detectAndCompute(InputArray _image, InputArray _mask,
 
     if( _descriptors.needed() )
     {
-        //t = (double)getTickCount();
         int dsize = descriptorSize();
-        _descriptors.create( (int)keypoints.size(), dsize, CV_32F );
-        Mat descriptors = _descriptors.getMat();
+        float scalingRatioIncrement = (scalingRatioLargest - scalingRatioSmallest) / (nSampledScales - 1);
 
-        calcDescriptors(gpyr, keypoints, descriptors, nOctaveLayers, firstOctave);
+        std::vector<Mat> initialDescFamily;
+        //t = (double)getTickCount();
+
+        for (int i = 0; i < nSampledScales; i++)
+        { 
+                //_descriptors.create( (int)keypoints.size(), dsize, CV_32F );
+                Mat descriptorsAtScale( (int)keypoints.size(), dsize, CV_32F );
+
+                float scalingRatio = i * scalingRatioIncrement + scalingRatioSmallest;
+
+                calcDescriptors(gpyr, keypoints, descriptorsAtScale, nOctaveLayers, firstOctave,
+                                scalingRatio);
+
+                initialDescFamily.push_back(descriptorsAtScale);
+        }
+
+
+        std::vector<Mat> stabilityDescFamily;
+
+        for (int i = 0; i < (int)initialDescFamily.size(); i++)
+        {
+                for (int j = i + 1; j < (int)initialDescFamily.size(); j++)
+                {
+                        Mat stabilityDescriptors( (int)keypoints.size(), dsize, CV_32F );
+
+                        absdiff( initialDescFamily[i], initialDescFamily[j], stabilityDescriptors );
+
+                        stabilityDescFamily.push_back(stabilityDescriptors);
+                }
+        }
+
+        for (int i = 0; i < (int)stabilityDescFamily.size(); i++)
+        {
+                Mat stabilityDescriptors = stabilityDescFamily[i];
+
+                for (int j = 0; j < stabilityDescriptors.rows; j++)
+                {
+                        float localThreshold;
+                        Mat desc = stabilityDescriptors.row(j).clone();
+
+                        cv::sort(desc, desc, SORT_EVERY_ROW);
+
+                        localThreshold = desc.at<float>(0, desc.cols / 2);
+
+                        for (int k = 0; k < dsize; k++)
+                        {
+                                if (stabilityDescriptors.at<float>(j, k) < localThreshold)
+                                {
+                                        stabilityDescriptors.at<float>(j, k) = 1.0f;
+                                }
+                                else
+                                {
+                                        stabilityDescriptors.at<float>(j, k) = 0.0f;
+                                }
+                        }
+                }
+        }
+
+        Mat asvDescriptors = stabilityDescFamily[0].clone();
+
+        for (int i = 1; i < (int)stabilityDescFamily.size(); i++)
+        {
+                add(asvDescriptors, stabilityDescFamily[i], asvDescriptors);
+        }
+
+        _descriptors.assign(asvDescriptors);
         //t = (double)getTickCount() - t;
         //printf("descriptor extraction time: %g\n", t*1000./tf);
     }
