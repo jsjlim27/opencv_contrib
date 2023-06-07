@@ -1,3 +1,10 @@
+/*
+ * Accumulated Stability Voting: A Robust Descriptor from Descriptors of 
+ * Multiple Scales.
+ *
+ * Implementation of the ASV-SIFT descriptor.
+ */
+
 #include "precomp.hpp"
 #include <iostream>
 #include <stdarg.h>
@@ -15,7 +22,7 @@ public:
     explicit ASVSIFT_Impl( int nfeatures = 0, int nOctaveLayers = 3,
                            double contrastThreshold = 0.04, double edgeThreshold = 10,
                            double sigma = 1.6,
-                           int nSampledScales = 10, 
+                           int nSampledScales = 10,
                            float scalingRatioSmallest = 1.0f / 6.0f,
                            float scalingRatioLargest = 3.0f);
 
@@ -46,8 +53,14 @@ protected:
     CV_PROP_RW double contrastThreshold;
     CV_PROP_RW double edgeThreshold;
     CV_PROP_RW double sigma;
+
+    // Number of descriptor samples to scale.
     CV_PROP_RW int nSampledScales;
-    CV_PROP_RW float scalingRatioSmallest;
+
+    // Smallest scaling ratio of the scaling neighborhood.
+    CV_PROP_RW float scalingRatioSmallest; 
+
+    // Largest scaling ratio of the scaling neighborhood.
     CV_PROP_RW float scalingRatioLargest;
 };
 
@@ -1018,6 +1031,206 @@ int ASVSIFT_Impl::defaultNorm() const
     return NORM_L2;
 }
 
+/* ----------------------------- ASV functions ----------------------------- */
+
+/*
+ * getScalingRatioIncrement(int, float, float)
+ *     Calculate the increment of one scaling ratio to the next nearest with the
+ *     given number of descriptor samples to scale nSampledScales, scaling 
+ *     ratio of the smallest scale scalingRatioSmallest, and scaling ratio of 
+ *     the largest scale scalingRatioLargest.
+ *
+ * pre-conditions:
+ *     nSampledScales > 1 is true.
+ *
+ * post-conditions:
+ *     Returns the scaling ratio increment.
+ */
+static float getScalingRatioIncrement(int nSampledScales,
+                                      float scalingRatioSmallest, 
+                                      float scalingRatioLargest)
+{
+    return (scalingRatioLargest - scalingRatioSmallest) / (nSampledScales - 1);
+}
+
+/*
+ * extractStabilityVector(const Mat&, const Mat&, Mat&)
+ *     Obtain the stability vector of a given pair of SIFT descriptors
+ *     extracted from the same keypoint, but at two different scales.
+ *
+ *     Stability is reflected as the absolute difference between the pair
+ *     of descriptors.
+ *
+ * pre-conditions: none.
+ *
+ * post-conditions:
+ *      - Mat stabilityVector contains stability information about siftDesc1 
+ *        and siftDesc2.
+ */
+static void extractStabilityVector(const Mat& siftDescs1, const Mat& siftDescs2, 
+                            Mat& stabilityVector)
+{
+    absdiff(siftDescs1, siftDescs2, stabilityVector);
+}
+
+/*
+ * buildStabilityVectors(const vector<Mat>&, vector<Mat>&)
+ *     Populate the container that stores all of the unique pair combinations 
+ *     of stability vectors.
+ *
+ * pre-conditions: none.
+ *
+ * post-conditions:
+ *     - vector<Mat> stabilityVectors contains every stability vector for all 
+ *       pair combinations.
+ */
+static void buildStabilityVectors(const std::vector<Mat>& siftDescriptors,
+                                  std::vector<Mat>& stabilityVectors)
+{
+    int nRows = siftDescriptors[0].rows;
+    int nCols = siftDescriptors[1].cols;
+    for (int i = 0; i < (int)siftDescriptors.size(); i++)
+    {
+        for (int j = i + 1; j < (int)siftDescriptors.size(); j++)
+        {
+            Mat stabilityVector(nRows, nCols, CV_32F );
+
+            extractStabilityVector(siftDescriptors[i], siftDescriptors[j],
+                                   stabilityVector);
+
+            stabilityVectors.push_back(stabilityVector);
+        }
+    }
+}
+
+/*
+ * getSVThreshold(const Mat&):
+ *
+ *     Determine the local threshold value for a given stability vector.
+ *
+ *     The local threshold value is determined as the median of the elements in
+ *     the stability vector.
+ *
+ * pre-conditions: none.
+ *
+ * post-conditions: 
+ *     - Returns a float representing the local threshold value for
+ *       a given stabilityVector.
+ */
+static float getSVThreshold(const Mat& stabilityVector)
+{
+    // To compute the median, first make a deep copy of the input vector, and 
+    // then sort its elements.
+    Mat aux = stabilityVector.clone();
+    cv::sort(aux, aux, SORT_EVERY_ROW);
+
+    // Return the median.
+    return aux.at<float>(0, stabilityVector.cols / 2);
+}
+
+/*
+ * definitelyLessThan(float, float):
+ *     Compare whether one float variable is less than the other.
+ *
+ * pre-conditions: none.
+ *
+ * post-conditions: 
+ *      - Returns true when a is less than b. 
+ *      - Returns false otherwise.
+ */
+static bool definitelyLessThan(float a, float b)
+{
+    return (b - a) > ( std::numeric_limits<float>::epsilon() *
+                            ( std::fabs(a) < std::fabs(b) ? std::fabs(b) : std::fabs(a) ) );
+}
+
+/*
+ * extractBinaryStabilityVector(const Mat&, Mat&):
+ *
+ *     Given a vector vIn containing stability information about a particular 
+ *     pair of SIFT descriptors extracted from the same keypoint but at two 
+ *     different scales, quantize each stability information contained in
+ *     elements of vIn as either a 1 or 0 and store them in vOut.
+ *
+ * pre-conditions:
+ *     - vOut.cols >= vIn.cols is true.
+ *
+ * post-conditions:
+ *     - Each element in vOut contains the quantized form of the
+ *       corresponding element in vIn.
+ */
+static void extractBinaryStabilityVector(const Mat& vIn, Mat& vOut)
+{
+    float localThreshold = getSVThreshold(vIn);
+
+    for (int i = 0; i < vIn.cols; i++)
+    {
+        float bin = vIn.at<float>(0, i);
+
+        if ( definitelyLessThan(bin, localThreshold) )
+        {
+            vOut.at<int>(0, i) = 1;
+        }
+        else
+        {
+            vOut.at<int>(0, i) = 0;
+        }
+    }
+}
+
+/*
+ * buildBinaryStabilityVectors(const vector<Mat>&, vector<Mat>&):
+ *    
+ *    Build the quantized verson of all the stability vectors.
+ *
+ * pre-conditions: none.
+ *
+ * post-conditions: 
+ *     - vector<Mat> out contains quantized version of all stability vectors.
+ */
+static void buildBinaryStabilityVectors(const std::vector<Mat>& in,
+                                 std::vector<Mat>& out)
+{
+    for (int i = 0; i < (int)in.size(); i++)
+    {
+        // Initialize space for the stability vectors of a particular pair.
+        Mat binaryVs(in[i].rows, in[i].cols, CV_32S);
+
+        for (int j = 0; j < in[i].rows; j++)
+        {
+            Mat v = in[i].row(j);
+            Mat binaryV = binaryVs.row(j);
+
+            extractBinaryStabilityVector(v, binaryV);
+        }
+
+        out.push_back(binaryVs);
+    }
+}
+
+/*
+ * extractASVDescriptors(const vector<Mat>&, Mat&)
+ *     Obtain the ASV-SIFT descriptors for all keypoints.
+ *     ASV stands for accumulated stability voting.
+ *
+ * pre-conditions: none.
+ *
+ * post-conditions:
+ *     - Mat descs contains ASV descriptors for all keypoints.
+ */
+static void extractASVDescriptors(const std::vector<Mat>& in, Mat& descs)
+{
+    // Initialize and fill the descriptors with zeros.
+    descs = Mat::zeros(in[0].rows, in[0].cols, CV_32F);
+
+    // Tally all the stability votes.
+    for (int i = 1; i < (int)in.size(); i++)
+    {
+        descs += in[i];
+    }
+}
+/* ------------------------------------------------------------------------- */
+
 void ASVSIFT_Impl::detectAndCompute(InputArray _image, InputArray _mask,
                                    std::vector<KeyPoint>& keypoints,
                                    OutputArray _descriptors,
@@ -1097,70 +1310,42 @@ void ASVSIFT_Impl::detectAndCompute(InputArray _image, InputArray _mask,
     if( _descriptors.needed() )
     {
         int dsize = descriptorSize();
-        float scalingRatioIncrement = (scalingRatioLargest - scalingRatioSmallest) / (nSampledScales - 1);
 
-        std::vector<Mat> initialDescFamily;
-        //t = (double)getTickCount();
+        // Calculate the increment of one scaling ratio to the next nearest.
+        float scalingRatioIncrement 
+            = getScalingRatioIncrement(nSampledScales, scalingRatioSmallest,
+                                       scalingRatioLargest);
 
+        // Build container holding SIFT descriptors at all scales.
+        std::vector<Mat> siftDescriptorsMultipleScales;
         for (int i = 0; i < nSampledScales; i++)
         { 
+            // Initialize descriptors at a particular scale.
             Mat descriptorsAtScale( (int)keypoints.size(), dsize, CV_32F );
 
+            // Determine the current scaling ratio.
             float scalingRatio = i * scalingRatioIncrement + scalingRatioSmallest;
 
+            // Calculate the descriptors at a particular scale with scalingRatio.
             calcDescriptors(gpyr, keypoints, descriptorsAtScale, nOctaveLayers, firstOctave,
                             scalingRatio);
 
-            initialDescFamily.push_back(descriptorsAtScale);
+            // Append descriptors at a particular scale to container.
+            siftDescriptorsMultipleScales.push_back(descriptorsAtScale);
         }
 
-        std::vector<Mat> stabilityDescFamily;
+        // Compute the stability vectors for all SIFT descriptor scale pair
+        // combinations.
+        std::vector<Mat> stabilityVectors;
+        buildStabilityVectors(siftDescriptorsMultipleScales, stabilityVectors);
 
-        for (int i = 0; i < (int)initialDescFamily.size(); i++)
-        {
-            for (int j = i + 1; j < (int)initialDescFamily.size(); j++)
-            {
-                Mat stabilityDescriptors( (int)keypoints.size(), dsize, CV_32F );
+        // Compute the quantized version of the stability vectors.
+        std::vector<Mat> binaryStabilityVectors;
+        buildBinaryStabilityVectors(stabilityVectors, binaryStabilityVectors);
 
-                absdiff( initialDescFamily[i], initialDescFamily[j], stabilityDescriptors );
-
-                stabilityDescFamily.push_back(stabilityDescriptors);
-            }
-        }
-
-        for (int i = 0; i < (int)stabilityDescFamily.size(); i++)
-        {
-            Mat stabilityDescriptors = stabilityDescFamily[i];
-
-            for (int j = 0; j < stabilityDescriptors.rows; j++)
-            {
-                float localThreshold;
-                Mat desc = stabilityDescriptors.row(j).clone();
-
-                cv::sort(desc, desc, SORT_EVERY_ROW);
-
-                localThreshold = desc.at<float>(0, desc.cols / 2);
-
-                for (int k = 0; k < dsize; k++)
-                {
-                    if (stabilityDescriptors.at<float>(j, k) < localThreshold)
-                    {
-                        stabilityDescriptors.at<float>(j, k) = 1.0f;
-                    }
-                    else
-                    {
-                        stabilityDescriptors.at<float>(j, k) = 0.0f;
-                    }
-                }
-            }
-        }
-
-        Mat asvDescriptors = stabilityDescFamily[0].clone();
-
-        for (int i = 1; i < (int)stabilityDescFamily.size(); i++)
-        {
-            add(asvDescriptors, stabilityDescFamily[i], asvDescriptors);
-        }
+        // Compute the ASV descriptors for all keypoints.
+        Mat asvDescriptors;
+        extractASVDescriptors(binaryStabilityVectors, asvDescriptors);
 
         _descriptors.assign(asvDescriptors);
         //t = (double)getTickCount() - t;
