@@ -40,3 +40,9 @@ Next, we need to *quantize* these stability vectors into binary.
 
 
 And finally, we need to tally all the stability votes in our binary stability vectors to obtain our ASV descriptors.
+
+### All of the necessary steps to obtain the ASV descriptors as described in the paper are currently implemented in src/asvsift.cpp.
+
+### Each of the added methods from line 1034 to 1232 are commented with an explanation of what they do, along with their pre and post conditions.
+
+### Also check out the changes made to detectAndCompute() starting at line 1234.
